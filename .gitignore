@@ -1,0 +1,14 @@
+# Build output of scripts/build.py; publish.yaml rebuilds it
+/dist/
+# Copied in by the render fixtures at test time: the companion faces and the built overlay
+/tests/fixtures/base/
+/tests/fixtures/dist/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Kiro skill artifacts (app-review, judgement, steering-maintenance)
+**/.app-review/
+**/.judgement/
+**/.steering-maintenance/

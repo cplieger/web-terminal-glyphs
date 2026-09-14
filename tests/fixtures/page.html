@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>web-terminal-glyphs render fixture</title>
+    <style>
+      @font-face { font-family: "Monaspace Neon NF"; src: url("base/MonaspaceNeonNF-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: block; }
+      @font-face { font-family: "Monaspace Neon NF"; src: url("base/MonaspaceNeonNF-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: block; }
+      @font-face { font-family: "Monaspace Neon NF"; src: url("base/MonaspaceNeonNF-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: block; }
+      @font-face { font-family: "Monaspace Neon NF"; src: url("base/MonaspaceNeonNF-BoldItalic.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: block; }
+      @font-face { font-family: "Web Terminal Glyphs"; src: url("dist/WebTerminalGlyphs.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: block; }
+      @font-face { font-family: "Web Terminal Glyphs"; src: url("dist/WebTerminalGlyphs.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: block; }
+      @font-face { font-family: "Web Terminal Glyphs"; src: url("dist/WebTerminalGlyphs.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: block; }
+      @font-face { font-family: "Web Terminal Glyphs"; src: url("dist/WebTerminalGlyphs.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: block; }
+      body { margin: 0; padding: 8px; background: #000; color: #fff; }
+      .term, .base, .ov { font-size: 14px; line-height: 17px; white-space: pre; font-synthesis: none; width: max-content; }
+      .term { font-family: "Web Terminal Glyphs", "Monaspace Neon NF", monospace; }
+      .base { font-family: "Monaspace Neon NF", monospace; }
+      .ov { font-family: "Web Terminal Glyphs", monospace; }
+    </style>
+  </head>
+  <body>
+    <main id="root"></main>
+    <script>
+      // setRows(cls, [[text, ...], ...]) renders one div per row with one span per run and
+      // resolves once every face the rows use has loaded.
+      window.setRows = async (cls, rows) => {
+        const root = document.getElementById("root");
+        root.textContent = "";
+        const block = document.createElement("div");
+        block.className = cls;
+        block.id = "block";
+        for (const runs of rows) {
+          const row = document.createElement("div");
+          row.className = "row";
+          for (const text of runs) {
+            const span = document.createElement("span");
+            span.textContent = text;
+            row.appendChild(span);
+          }
+          block.appendChild(row);
+        }
+        root.appendChild(block);
+        block.getBoundingClientRect();
+        await document.fonts.ready;
+        return block.id;
+      };
+      window.probe = (rowIndex) => {
+        const row = document.querySelectorAll("#block .row")[rowIndex];
+        const span = row.querySelector("span:last-child");
+        const marker = document.createElement("i");
+        marker.style.cssText = "display:inline-block;width:0;height:0;padding:0;margin:0;border:0;vertical-align:baseline";
+        span.appendChild(marker);
+        const r = row.getBoundingClientRect(), s = span.getBoundingClientRect(), m = marker.getBoundingClientRect();
+        marker.remove();
+        return { baseline: +(m.top - r.top).toFixed(3), spanHeight: +s.height.toFixed(3), rowHeight: +r.height.toFixed(3) };
+      };
+    </script>
+  </body>
+</html>

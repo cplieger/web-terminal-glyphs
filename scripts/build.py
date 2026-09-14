@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Build dist/WebTerminalGlyphs.woff2, cell.json, LICENSE and NOTICE from the geometry table.
+
+Usage: uv run scripts/build.py [dist_dir]
+"""
+
+import json
+import sys
+from pathlib import Path
+
+from fontTools.fontBuilder import FontBuilder
+from fontTools.misc.timeTools import timestampFromString
+from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.t2CharStringPen import T2CharStringPen
+from fontTools.ttLib import TTFont
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from glyphs import cell, table
+from glyphs.families import dots, grid, shade, strokes, triangles
+from glyphs.families import round as round_
+
+FAMILIES = {
+    'grid': grid,
+    'dots': dots,
+    'strokes': strokes,
+    'triangles': triangles,
+    'round': round_,
+    'shade': shade,
+}
+ROOT = Path(__file__).resolve().parent.parent
+FONT_FILE = 'WebTerminalGlyphs.woff2'
+NOTICE = (
+    'Web Terminal Glyphs\n'
+    f'{cell.COPYRIGHT}\n\n'
+    "Generated from this repository's geometry tables. Contains no glyph outlines from any other font.\n"
+)
+USE_TYPO_METRICS = 1 << 7
+BUILD_TIMESTAMP = timestampFromString('Thu Jan  1 00:00:00 2026')
+REGULAR = 1 << 6
+
+
+def glyph_name(cp: int) -> str:
+    return f'uni{cp:04X}' if cp < 0x10000 else f'u{cp:04X}'
+
+
+def charstring(contours):
+    pen = T2CharStringPen(width=cell.ADVANCE_UNITS, glyphSet=None)
+    for contour in contours:
+        pen.moveTo(contour[0])
+        for seg in contour[1:]:
+            if len(seg) == 2:
+                pen.lineTo(seg)
+            else:
+                pen.curveTo(seg[0:2], seg[2:4], seg[4:6])
+        pen.closePath()
+    return pen.getCharString()
+
+
+def ink_bounds(glyph_bounds) -> tuple[int, int, int, int]:
+    inked = [b for b in glyph_bounds if b]
+    return (
+        round(min(b[0] for b in inked)),
+        round(min(b[1] for b in inked)),
+        round(max(b[2] for b in inked)),
+        round(max(b[3] for b in inked)),
+    )
+
+
+def glyph_bounds(font: TTFont) -> dict[str, tuple[int, int, int, int] | None]:
+    glyph_set = font.getGlyphSet()
+    out = {}
+    for name in glyph_set:
+        pen = BoundsPen(glyph_set)
+        glyph_set[name].draw(pen)
+        out[name] = pen.bounds and tuple(round(v) for v in pen.bounds)
+    return out
+
+
+def build_font() -> tuple[FontBuilder, tuple[int, int, int, int]]:
+    codepoints = sorted(table.TABLE)
+    names = {cp: glyph_name(cp) for cp in codepoints}
+    charstrings = {'.notdef': charstring([])}
+    for cp in codepoints:
+        family, params = table.TABLE[cp]
+        charstrings[names[cp]] = charstring(FAMILIES[family].draw(params))
+
+    fb = FontBuilder(unitsPerEm=cell.UPEM, isTTF=False)
+    fb.setupGlyphOrder(['.notdef', *names.values()])
+    fb.setupCharacterMap({cp: names[cp] for cp in codepoints})
+    fb.setupCFF(
+        cell.POSTSCRIPT_NAME,
+        {
+            'FullName': cell.FAMILY_NAME,
+            'FamilyName': cell.FAMILY_NAME,
+            'Weight': 'Regular',
+            'version': cell.VERSION,
+            'Notice': cell.COPYRIGHT,
+        },
+        charstrings,
+        {},
+    )
+    # calcBounds needs the Private dict setupCFF attaches to each charstring.
+    per_glyph = {name: cs.calcBounds(None) for name, cs in charstrings.items()}
+    fb.setupHorizontalMetrics(
+        {name: (cell.ADVANCE_UNITS, round(b[0]) if b else 0) for name, b in per_glyph.items()}
+    )
+    bounds = ink_bounds(per_glyph.values())
+    fb.setupHorizontalHeader(
+        ascent=cell.COMPANION_ASCENDER_UNITS,
+        descent=cell.COMPANION_DESCENDER_UNITS,
+        lineGap=cell.COMPANION_LINE_GAP_UNITS,
+    )
+    fb.setupNameTable(
+        {
+            'copyright': cell.COPYRIGHT,
+            'familyName': cell.FAMILY_NAME,
+            'styleName': 'Regular',
+            'uniqueFontIdentifier': f'{cell.VERSION};{cell.POSTSCRIPT_NAME}',
+            'fullName': cell.FAMILY_NAME,
+            'version': f'Version {cell.VERSION}',
+            'psName': cell.POSTSCRIPT_NAME,
+            'licenseDescription': cell.LICENSE_ID,
+            'licenseInfoURL': cell.LICENSE_URL,
+        }
+    )
+    fb.setupOS2(
+        version=4,
+        sTypoAscender=cell.COMPANION_ASCENDER_UNITS,
+        sTypoDescender=cell.COMPANION_DESCENDER_UNITS,
+        sTypoLineGap=cell.COMPANION_LINE_GAP_UNITS,
+        usWinAscent=bounds[3],
+        usWinDescent=-bounds[1],
+        fsSelection=USE_TYPO_METRICS | REGULAR,
+        fsType=0,
+        achVendID='CPLG',
+    )
+    fb.setupPost()
+    fb.updateHead(
+        fontRevision=float(cell.VERSION),
+        created=BUILD_TIMESTAMP,
+        modified=BUILD_TIMESTAMP,
+        xMin=bounds[0],
+        yMin=bounds[1],
+        xMax=bounds[2],
+        yMax=bounds[3],
+    )
+    return fb, bounds
+
+
+def verify(path: Path, expected_glyphs: int) -> None:
+    font = TTFont(path)
+    cmap = font.getBestCmap()
+    if len(cmap) != expected_glyphs or 0x20 in cmap:
+        raise SystemExit(f'cmap has {len(cmap)} entries, expected {expected_glyphs} without U+0020')
+    wrong = [
+        name for name, (advance, _) in font['hmtx'].metrics.items() if advance != cell.ADVANCE_UNITS
+    ]
+    if wrong:
+        raise SystemExit(f'advance is not {cell.ADVANCE_UNITS} on {wrong[:5]}')
+    bearings = [
+        name
+        for name, bounds in glyph_bounds(font).items()
+        if font['hmtx'].metrics[name][1] != (bounds[0] if bounds else 0)
+    ]
+    if bearings:
+        raise SystemExit(f'left side bearing is not the ink xMin on {bearings[:5]}')
+    if font['hhea'].ascent != font['OS/2'].sTypoAscender:
+        raise SystemExit('hhea.ascender differs from OS/2.sTypoAscender')
+    if font['head'].unitsPerEm != cell.UPEM:
+        raise SystemExit(f'unitsPerEm is {font["head"].unitsPerEm}, expected {cell.UPEM}')
+
+
+def write_cell_json(path: Path) -> None:
+    data = {
+        'family': cell.FAMILY_NAME,
+        'companion': {
+            'family': cell.COMPANION_FAMILY,
+            'unitsPerEm': cell.UPEM,
+            'advance': cell.ADVANCE_UNITS,
+            'ascender': cell.COMPANION_ASCENDER_UNITS,
+            'descender': cell.COMPANION_DESCENDER_UNITS,
+            'lineGap': cell.COMPANION_LINE_GAP_UNITS,
+        },
+        'cell': {
+            'fontSize': cell.CELL_FONT_SIZE_PX,
+            'lineHeight': cell.CELL_LINE_HEIGHT_PX,
+            'ratio': round(cell.CELL_RATIO, 7),
+            'baseline': cell.CELL_BASELINE_PX,
+            'top': cell.TOP_UNITS,
+            'bottom': cell.BOTTOM_UNITS,
+            'overhang': cell.OVERHANG_UNITS,
+        },
+        'stack': [cell.FAMILY_NAME, cell.COMPANION_FAMILY],
+        'generated': table.generated_ranges(),
+    }
+    path.write_text(json.dumps(data, indent=2) + '\n')
+
+
+def main() -> None:
+    dist = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'dist'
+    dist.mkdir(parents=True, exist_ok=True)
+    fb, bounds = build_font()
+    fb.font.flavor = 'woff2'
+    font_path = dist / FONT_FILE
+    fb.save(font_path)
+    verify(font_path, len(table.TABLE))
+    write_cell_json(dist / 'cell.json')
+    root_license = ROOT / 'LICENSE'
+    if root_license.exists():
+        (dist / 'LICENSE').write_bytes(root_license.read_bytes())
+    else:
+        print('warning: no LICENSE at the repo root; writing a placeholder', file=sys.stderr)
+        (dist / 'LICENSE').write_text(f'{cell.LICENSE_ID}: {cell.LICENSE_URL}\n')
+    (dist / 'NOTICE').write_text(NOTICE)
+    print(
+        f'{len(table.TABLE)} glyphs, {font_path.stat().st_size} bytes, ink bounds x [{bounds[0]}, {bounds[2]}] y [{bounds[1]}, {bounds[3]}]'
+    )
+
+
+if __name__ == '__main__':
+    main()
