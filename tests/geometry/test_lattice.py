@@ -57,7 +57,8 @@ def close(actual, expected, tolerance):
     ids=['light-shade', 'medium-shade', 'dark-shade', 'checker', 'inverse-checker'],
 )
 def test_pattern_lattice_bbox_is_the_cell(bounds, codepoint):
-    assert close(bounds(codepoint), CELL, (0, 0, 0, 1)), bounds(codepoint)
+    box = bounds(codepoint)
+    assert close(box, CELL, (0, 0, 0, 1)), box
 
 
 @pytest.mark.parametrize(
@@ -80,7 +81,8 @@ def test_shade_rows_alternate_304_303_from_the_bottom(contour_boxes):
 
 def test_braille_dots_fill_the_cell_minus_the_dot_inset(bounds):
     expected = (DOT_INSET_X, -500 + DOT_INSET_Y, 1240 - DOT_INSET_X, 1929 - DOT_INSET_Y)
-    assert close(bounds(BRAILLE_ALL_DOTS), expected, (0, 0, 0, 1)), bounds(BRAILLE_ALL_DOTS)
+    box = bounds(BRAILLE_ALL_DOTS)
+    assert close(box, expected, (0, 0, 0, 1)), box
 
 
 @pytest.mark.parametrize(
