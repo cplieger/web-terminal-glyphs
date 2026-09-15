@@ -46,7 +46,7 @@ OCTANT_PIECES = [
 ]
 
 
-def close(actual, expected, tolerance):
+def within_tolerance(actual, expected, tolerance):
     return all(abs(a - e) <= t for a, e, t in zip(actual, expected, tolerance, strict=True))
 
 
@@ -63,7 +63,7 @@ def close(actual, expected, tolerance):
 )
 def test_pattern_lattice_bbox(bounds, codepoint, expected):
     box = bounds(codepoint)
-    assert close(box, expected, (0, 0, 0, 1)), box
+    assert within_tolerance(box, expected, (0, 0, 0, 1)), box
 
 
 @pytest.mark.parametrize(
@@ -126,7 +126,7 @@ def test_dark_shade_is_the_full_block_minus_the_light_dots(contour_boxes):
 def test_braille_dots_fill_the_cell_minus_the_dot_inset(bounds):
     expected = (DOT_INSET_X, -500 + DOT_INSET_Y, 1240 - DOT_INSET_X, 1929 - DOT_INSET_Y)
     box = bounds(BRAILLE_ALL_DOTS)
-    assert close(box, expected, (0, 0, 0, 1)), box
+    assert within_tolerance(box, expected, (0, 0, 0, 1)), box
 
 
 @pytest.mark.parametrize(
