@@ -10,9 +10,10 @@ The six geometry rules every generator obeys:
 1. A solid glyph extends OVERHANG_UNITS past each cell edge it touches and never past an internal
    boundary (`overhang`), so every boundary device pixel is fully inside one neighbour.
 2. A lattice glyph spans exactly one cell pitch with an integer period allocation (`split`).
-3. Fractional blocks land on `split` fractions; only their outer edges overhang.
-4. Strokes are LIGHT/HEAVY_STROKE_UNITS; double is two light strokes DOUBLE_GAP_UNITS apart;
-   dashes split a stroke into equal segments with equal gaps, half a gap at each edge.
+3. Fractional blocks land on `split` fractions; only outer edges overhang.
+4. Strokes are LIGHT/HEAVY_STROKE_UNITS wide, the companion's, on the companion's MIDLINE_Y and
+   CENTRE_X so a junction's arm lands on the line the companion's dashes do; double is two light
+   strokes DOUBLE_GAP_UNITS apart.
 5. Arcs and circles use the light stroke and a radius of half the cell width.
 6. Every glyph advances ADVANCE_UNITS.
 """
@@ -35,6 +36,8 @@ CELL_LINE_HEIGHT_PX = 17
 CELL_BASELINE_PX = 13.5
 CELL_RATIO = CELL_LINE_HEIGHT_PX / CELL_FONT_SIZE_PX
 
+# The companion's stroke widths and double gap (Monaspace Neon NF: light 160, heavy 400, the
+# double rails 160 apart), so a kept junction meets a companion stroke flush.
 LIGHT_STROKE_UNITS = 160
 HEAVY_STROKE_UNITS = 400
 DOUBLE_GAP_UNITS = 160
@@ -42,7 +45,7 @@ STROKE_UNITS = {'light': LIGHT_STROKE_UNITS, 'heavy': HEAVY_STROKE_UNITS}
 
 FAMILY_NAME = 'Web Terminal Glyphs'
 POSTSCRIPT_NAME = 'WebTerminalGlyphs-Regular'
-VERSION = '1.000'
+VERSION = '1.100'
 COPYRIGHT = 'Copyright 2026 cplieger'
 LICENSE_ID = 'Apache-2.0'
 LICENSE_URL = 'https://www.apache.org/licenses/LICENSE-2.0'
@@ -58,13 +61,19 @@ def x_bounds(n: int) -> list[int]:
     return split(0, ADVANCE_UNITS, n)
 
 
+# The companion's horizontal midline: Monaspace Neon NF centres its light horizontal on y 645
+# (565..725), and its dashes are the one companion glyph a stroke of ours meets, so every stroke,
+# rail and arc sits there. The lattice's own centre is CENTRE_Y, 69 units higher: the half blocks
+# and everything else that meets only our own glyphs stays on the lattice.
+MIDLINE_Y = 645
+CENTRE_Y = split(BOTTOM_UNITS, LATTICE_HEIGHT_UNITS, 2)[1]
+
+
 def y_bounds(n: int) -> list[int]:
-    """Bottom to top."""
     return split(BOTTOM_UNITS, LATTICE_HEIGHT_UNITS, n)
 
 
 CENTRE_X = x_bounds(2)[1]
-MIDLINE_Y = y_bounds(2)[1]
 LEFT_OVERHANG = -OVERHANG_UNITS
 RIGHT_OVERHANG = ADVANCE_UNITS + OVERHANG_UNITS
 BOTTOM_OVERHANG = BOTTOM_UNITS - OVERHANG_UNITS

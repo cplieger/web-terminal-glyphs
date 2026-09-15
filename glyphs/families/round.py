@@ -1,7 +1,9 @@
 """Rounded shapes: box-drawing arcs, circles, powerline half-discs, spinners, progress bars,
 justified circle parts, the twelfth-circle grid and kitty's commit markers.
 
-Angles are degrees, counter-clockwise from +x with y up.
+Angles are degrees, counter-clockwise from +x with y up. Shapes that join a box stroke (the arcs,
+the commit markers) sit on the companion's MIDLINE_Y; shapes that join nothing are centred on
+the cell, CENTRE_Y.
 """
 
 import math
@@ -12,7 +14,7 @@ from glyphs.families.strokes import HALF_LIGHT, box
 
 RADIUS = cell.ADVANCE_UNITS // 2
 INNER = RADIUS - cell.LIGHT_STROKE_UNITS
-CX, CY = cell.CENTRE_X, cell.MIDLINE_Y
+CX = cell.CENTRE_X
 SIGN = {'n': 1, 's': -1, 'e': 1, 'w': -1}
 
 
@@ -20,7 +22,7 @@ def corner(vertical: str, horizontal: str) -> list[Contour]:
     """A light quarter-circle arc of radius RADIUS joining the `vertical` and `horizontal` arms,
     plus the straight stubs from the arc's tangent points to the cell edges."""
     sx, sy = SIGN[horizontal], SIGN[vertical]
-    cx, cy = CX + sx * RADIUS, CY + sy * RADIUS
+    cx, cy = CX + sx * RADIUS, cell.MIDLINE_Y + sy * RADIUS
     a_vertical = 180 if sx > 0 else 360
     a_horizontal = 270 if sy > 0 else 90
     if a_vertical - a_horizontal > 180:
@@ -30,7 +32,14 @@ def corner(vertical: str, horizontal: str) -> list[Contour]:
     out.append(rect(CX - HALF_LIGHT, CX + HALF_LIGHT, min(cy, y_edge), max(cy, y_edge)))
     x_edge = cell.RIGHT_OVERHANG if sx > 0 else cell.LEFT_OVERHANG
     if x_edge != cx:
-        out.append(rect(min(cx, x_edge), max(cx, x_edge), CY - HALF_LIGHT, CY + HALF_LIGHT))
+        out.append(
+            rect(
+                min(cx, x_edge),
+                max(cx, x_edge),
+                cell.MIDLINE_Y - HALF_LIGHT,
+                cell.MIDLINE_Y + HALF_LIGHT,
+            )
+        )
     return out
 
 
@@ -44,11 +53,12 @@ def corners(arms: list[tuple[str, str]], line: str | None = None) -> list[Contou
 
 
 def circle(kind: str) -> list[Contour]:
+    cy = cell.CENTRE_Y
     if kind == 'white':
-        return ring(CX, CY, RADIUS, INNER)
+        return ring(CX, cy, RADIUS, INNER)
     if kind == 'black':
-        return [ellipse(CX, CY, RADIUS, RADIUS)]
-    return [*ring(CX, CY, RADIUS, INNER), ellipse(CX, CY, RADIUS // 2, RADIUS // 2)]
+        return [ellipse(CX, cy, RADIUS, RADIUS)]
+    return [*ring(CX, cy, RADIUS, INNER), ellipse(CX, cy, RADIUS // 2, RADIUS // 2)]
 
 
 def half_disc(bulge: str, *, outline: bool = False) -> list[Contour]:
@@ -58,14 +68,15 @@ def half_disc(bulge: str, *, outline: bool = False) -> list[Contour]:
     cx = 0 if bulge == 'e' else rx
     a0, a1 = (-90, 90) if bulge == 'e' else (90, 270)
     flat = cell.LEFT_OVERHANG if bulge == 'e' else cell.RIGHT_OVERHANG
+    cy = cell.CENTRE_Y
     if outline:
         d = cell.LIGHT_STROKE_UNITS
         return [
             [
-                arc_start(cx, CY, rx, ry, a0),
-                *arc(cx, CY, rx, ry, a0, a1),
-                arc_start(cx, CY, rx - d, ry - d, a1),
-                *arc(cx, CY, rx - d, ry - d, a1, a0),
+                arc_start(cx, cy, rx, ry, a0),
+                *arc(cx, cy, rx, ry, a0, a1),
+                arc_start(cx, cy, rx - d, ry - d, a1),
+                *arc(cx, cy, rx - d, ry - d, a1, a0),
             ]
         ]
     first, last = (
@@ -74,39 +85,40 @@ def half_disc(bulge: str, *, outline: bool = False) -> list[Contour]:
         else (cell.TOP_OVERHANG, cell.BOTTOM_OVERHANG)
     )
     return [
-        [(flat, first), arc_start(cx, CY, rx, ry, a0), *arc(cx, CY, rx, ry, a0, a1), (flat, last)]
+        [(flat, first), arc_start(cx, cy, rx, ry, a0), *arc(cx, cy, rx, ry, a0, a1), (flat, last)]
     ]
 
 
 def spinner(a0: float, a1: float) -> list[Contour]:
-    return [arc_band(CX, CY, RADIUS, INNER, a0, a1)]
+    return [arc_band(CX, cell.CENTRE_Y, RADIUS, INNER, a0, a1)]
 
 
 def progress(part: str, *, filled: bool) -> list[Contour]:
-    """A capsule of diameter RADIUS * 2 centred on the midline; `part` is its w end, middle or e
+    """A capsule of diameter RADIUS * 2 centred on the cell; `part` is its w end, middle or e
     end. Filled adds an inner bar one stroke inside the outline."""
-    top, bottom = CY + RADIUS, CY - RADIUS
+    cy = cell.CENTRE_Y
+    top, bottom = cy + RADIUS, cy - RADIUS
     inner_r = RADIUS - 2 * cell.LIGHT_STROKE_UNITS
     x0, x1 = cell.LEFT_OVERHANG, cell.RIGHT_OVERHANG
     out: list[Contour] = []
     if part == 'w':
         x0 = CX
-        out.append(arc_band(CX, CY, RADIUS, INNER, 90, 270))
+        out.append(arc_band(CX, cy, RADIUS, INNER, 90, 270))
         if filled:
             out.append(
-                [arc_start(CX, CY, inner_r, inner_r, 90), *arc(CX, CY, inner_r, inner_r, 90, 270)]
+                [arc_start(CX, cy, inner_r, inner_r, 90), *arc(CX, cy, inner_r, inner_r, 90, 270)]
             )
     elif part == 'e':
         x1 = CX
-        out.append(arc_band(CX, CY, RADIUS, INNER, -90, 90))
+        out.append(arc_band(CX, cy, RADIUS, INNER, -90, 90))
         if filled:
             out.append(
-                [arc_start(CX, CY, inner_r, inner_r, -90), *arc(CX, CY, inner_r, inner_r, -90, 90)]
+                [arc_start(CX, cy, inner_r, inner_r, -90), *arc(CX, cy, inner_r, inner_r, -90, 90)]
             )
     out.append(rect(x0, x1, top - cell.LIGHT_STROKE_UNITS, top))
     out.append(rect(x0, x1, bottom, bottom + cell.LIGHT_STROKE_UNITS))
     if filled:
-        out.append(rect(x0, x1, CY - inner_r, CY + inner_r))
+        out.append(rect(x0, x1, cy - inner_r, cy + inner_r))
     return out
 
 
@@ -114,7 +126,12 @@ def justified(edge: str, *, outline: bool = False) -> list[Contour]:
     """A half circle of radius RADIUS whose diameter lies on the named cell edge, filled or as a
     light ring; the flat side and the ring ends take the overhang."""
     cx = {'n': CX, 's': CX, 'w': 0, 'e': cell.ADVANCE_UNITS}[edge]
-    cy = {'n': cell.LATTICE_TOP_UNITS, 's': cell.BOTTOM_UNITS, 'w': CY, 'e': CY}[edge]
+    cy = {
+        'n': cell.LATTICE_TOP_UNITS,
+        's': cell.BOTTOM_UNITS,
+        'w': cell.CENTRE_Y,
+        'e': cell.CENTRE_Y,
+    }[edge]
     a0 = {'n': 180, 's': 0, 'w': -90, 'e': 90}[edge]
     if not outline:
         if edge in 'ns':
@@ -209,15 +226,15 @@ def _frame_crossing(
 
 def commit(lines: str, *, solid: bool) -> list[Contour]:
     """kitty's branch node: a circle at 0.9 of RADIUS with light stubs to the edges in `lines`."""
-    r = round(RADIUS * 0.9)
-    out = [ellipse(CX, CY, r, r)] if solid else ring(CX, CY, r, r - cell.LIGHT_STROKE_UNITS)
+    r, cy = round(RADIUS * 0.9), cell.MIDLINE_Y
+    out = [ellipse(CX, cy, r, r)] if solid else ring(CX, cy, r, r - cell.LIGHT_STROKE_UNITS)
     for side in lines:
         if side in 'ns':
-            y0, y1 = (CY + r, cell.TOP_OVERHANG) if side == 'n' else (cell.BOTTOM_OVERHANG, CY - r)
+            y0, y1 = (cy + r, cell.TOP_OVERHANG) if side == 'n' else (cell.BOTTOM_OVERHANG, cy - r)
             out.append(rect(CX - HALF_LIGHT, CX + HALF_LIGHT, y0, y1))
         else:
             x0, x1 = (CX + r, cell.RIGHT_OVERHANG) if side == 'e' else (cell.LEFT_OVERHANG, CX - r)
-            out.append(rect(x0, x1, CY - HALF_LIGHT, CY + HALF_LIGHT))
+            out.append(rect(x0, x1, cy - HALF_LIGHT, cy + HALF_LIGHT))
     return out
 
 

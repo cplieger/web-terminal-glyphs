@@ -1,6 +1,6 @@
-"""Pins on the built font for the stroke family: the heavy width, the double gap, the 2 / 3 / 4
-dash split with its equal gaps (154 horizontally, 302 vertically, half a gap at each cell edge),
-the arc and circle radius, and the diagonal's reach."""
+"""Pins on the built font for the stroke family: the heavy width, the double rails, the arc and
+spinner radius, and the diagonal's reach. The dashes ship no glyph (the companion tiles them), so
+their split is covered by the companion contract test's touch-set rather than a pin here."""
 
 import pytest
 
@@ -12,44 +12,31 @@ def test_heavy_stroke_is_400_wide_and_overhangs_like_the_light_one(bounds):
 
 
 def test_double_stroke_is_two_light_strokes_160_apart(contour_boxes):
-    assert contour_boxes(0x2550) == [(-72, 474, 1312, 634), (-72, 794, 1312, 954)]
+    assert contour_boxes(0x2551) == [(380, -572, 540, 2001), (700, -572, 860, 2001)]
 
 
-@pytest.mark.parametrize(
-    ('codepoint', 'segments'),
-    [
-        (0x254C, [(77, 634, 543, 794), (697, 634, 1163, 794)]),
-        (0x2504, [(77, 634, 336, 794), (490, 634, 750, 794), (904, 634, 1163, 794)]),
-        (
-            0x2508,
-            [
-                (77, 634, 233, 794),
-                (387, 634, 543, 794),
-                (697, 634, 853, 794),
-                (1007, 634, 1163, 794),
-            ],
-        ),
-        (0x2506, [(540, -349, 700, 158), (540, 460, 700, 968), (540, 1270, 700, 1777)]),
-    ],
-    ids=['double-dash', 'triple-dash', 'quadruple-dash', 'vertical-triple-dash'],
-)
-def test_dashes_split_the_stroke_with_equal_gaps_and_no_overhang(
-    contour_boxes, codepoint, segments
-):
-    assert contour_boxes(codepoint) == segments
-
-
-def test_arc_has_radius_620_to_the_stroke_centre(bounds, contour_boxes):
-    assert bounds(0x256D) == (540, -572, 1312, 794)
-    assert contour_boxes(0x256D) == [
-        (540, -572, 700, 94),
-        (540, 94, 1240, 794),
-        (1240, 634, 1312, 794),
+def test_double_horizontal_rails_sit_astride_the_midline(contour_boxes):
+    assert contour_boxes(0x256A) == [
+        (-72, 405, 1312, 565),
+        (-72, 725, 1312, 885),
+        (540, -572, 700, 2001),
     ]
 
 
-def test_circle_has_radius_620_and_a_light_ring(contour_boxes):
-    assert contour_boxes(0x25CB) == [(0, 94, 1240, 1334), (160, 254, 1080, 1174)]
+def test_arc_has_radius_620_to_the_stroke_centre(bounds, contour_boxes):
+    assert bounds(0x2570) == (540, 565, 1312, 2001)
+    assert contour_boxes(0x2570) == [
+        (540, 565, 1240, 1265),
+        (540, 1265, 700, 2001),
+        (1240, 565, 1312, 725),
+    ]
+
+
+def test_spinner_has_radius_620_and_a_light_band(bounds):
+    """The Fira spinner arcs share RADIUS and INNER with the circles the companion now draws; the
+    arc U+EE09 is the lower half turn, so its band spans the diameter and reaches down one radius
+    from the cell centre."""
+    assert bounds(0xEE09) == (0, 94, 1240, 714)
 
 
 @pytest.mark.parametrize('codepoint', [0x2571, 0x2572], ids=['rising', 'falling'])

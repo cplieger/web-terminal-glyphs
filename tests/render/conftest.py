@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from fontTools.ttLib import TTFont
 
 from tests.render import pixels
 
@@ -76,6 +77,12 @@ def companion_dir() -> Path:
             pytrace=False,
         )
     return Path(where)
+
+
+@pytest.fixture(scope='session')
+def companion_font() -> TTFont:
+    """The companion's Regular face, for the contract test that recomputes what it tiles."""
+    return TTFont(companion_dir() / COMPANION_FILES[0])
 
 
 @pytest.fixture(scope='session')

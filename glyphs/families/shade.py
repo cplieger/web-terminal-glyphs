@@ -1,20 +1,37 @@
-"""Shades: dithers on the 4 x 8 lattice, the coarse checkerboards, stripes and diagonal hatches.
+"""Shades: the three dot dithers, the coarse checkerboards, stripes and diagonal hatches.
 
-The 25% dither puts one square per row in column 0, 2, 1, 3 (repeating), so it touches every cell
-edge and tiles with a four-row period; 75% is its complement and 50% the checkerboard.
+The dithers are the companion's, re-pitched to tile. Monaspace Neon NF draws the light shade as
+138 x 155 dots on a 6 x 8 checkerboard (columns 207 apart, rows 311 apart, so eight rows overrun
+the 2428-unit row and the pattern resets at every cell seam) and the medium shade as 138 x 159
+dots on 8 x 14. Here the same dots and the same phase sit on `cell.x_bounds` / `cell.y_bounds`
+lattices, so the pitch across a cell seam equals the pitch inside the cell, and the dark shade
+is the full block with the light shade's dots as holes.
 """
 
+from typing import NamedTuple
+
 from glyphs import cell
-from glyphs.contour import Contour, clip, half_plane, polygon
+from glyphs.contour import Contour, clip, half_plane, polygon, rect
 from glyphs.families import grid, triangles
 
-COLS, ROWS = 4, 8
-LIGHT_COLUMN = (0, 2, 1, 3)
+
+class Dither(NamedTuple):
+    cols: int
+    rows: int
+    dot: tuple[int, int]
+    phase: int  # a dot sits at (row r from the bottom, column c) iff (r + c) % 2 == phase
+
+
+LIGHT = Dither(6, 8, (138, 155), 1)
+MEDIUM = Dither(8, 14, (138, 159), 0)
+INVERSE = MEDIUM._replace(phase=1)
+KINDS = {'light': LIGHT, 'medium': MEDIUM, 'inverse': INVERSE}
+# Half of the MEDIUM lattice per side, as (rows from the bottom, columns).
 HALVES = {
-    'n': (range(4), range(COLS)),
-    's': (range(4, ROWS), range(COLS)),
-    'w': (range(ROWS), range(2)),
-    'e': (range(ROWS), range(2, COLS)),
+    'n': (range(7, 14), range(8)),
+    's': (range(7), range(8)),
+    'w': (range(14), range(4)),
+    'e': (range(14), range(4, 8)),
 }
 OPPOSITE = {'n': 's', 's': 'n', 'e': 'w', 'w': 'e'}
 DIAGONAL_CORNERS = {
@@ -25,42 +42,51 @@ DIAGONAL_CORNERS = {
 }
 
 
-def _filled(kind: str, row: int, col: int) -> bool:
-    """`row` counts from the top of the cell."""
-    r = ROWS - 1 - row
-    light = col == LIGHT_COLUMN[r % 4]
-    return {
-        'light': light,
-        'dark': not light,
-        'medium': (r + col) % 2 == 0,
-        'inverse': (r + col) % 2 == 1,
-    }[kind]
+def dots(kind: Dither, rows: range, cols: range) -> list[Contour]:
+    """The dots of `kind` in the given rows (from the bottom) and columns, each centred in its
+    lattice cell."""
+    xs, ys = cell.x_bounds(kind.cols), cell.y_bounds(kind.rows)
+    w, h = kind.dot
+    out: list[Contour] = []
+    for r in rows:
+        for c in cols:
+            if (r + c) % 2 != kind.phase:
+                continue
+            x0 = xs[c] + (xs[c + 1] - xs[c] - w) // 2
+            y0 = ys[r] + (ys[r + 1] - ys[r] - h) // 2
+            out.append(rect(x0, x0 + w, y0, y0 + h))
+    return out
+
+
+def dark() -> list[Contour]:
+    """The full block with the light shade's dots punched out."""
+    block = rect(*cell.overhang(0, cell.ADVANCE_UNITS, cell.BOTTOM_UNITS, cell.LATTICE_TOP_UNITS))
+    holes = [polygon(dot, hole=True) for dot in dots(LIGHT, range(LIGHT.rows), range(LIGHT.cols))]
+    return [block, *holes]
 
 
 def dither(kind: str, half: str | None = None, *, fill_rest: bool = False) -> list[Contour]:
-    rows, cols = HALVES[half] if half else (range(ROWS), range(COLS))
-    mask = {(r, c) for r in rows for c in cols if _filled(kind, r, c)}
-    out = grid.cells(COLS, ROWS, mask)
+    if kind == 'dark':
+        return dark()
+    lattice = KINDS[kind]
+    rows, cols = HALVES[half] if half else (range(lattice.rows), range(lattice.cols))
+    out = dots(lattice, rows, cols)
     if fill_rest:
         rows, cols = HALVES[OPPOSITE[half]]
-        out += grid.cells(COLS, ROWS, {(r, c) for r in rows for c in cols}, solid=True)
+        xs, ys = cell.x_bounds(lattice.cols), cell.y_bounds(lattice.rows)
+        out += grid.block(xs[cols[0]], xs[cols[-1] + 1], ys[rows[0]], ys[rows[-1] + 1])
     return out
 
 
 def triangular(corner: str) -> list[Contour]:
-    """The 50% dither clipped to the half of the cell on `corner`'s side of the diagonal."""
+    """The medium shade clipped to the half of the cell on `corner`'s side of the diagonal."""
     p, q, side = DIAGONAL_CORNERS[corner]
     plane = half_plane(triangles.at(*p), triangles.at(*q), side)
-    xs, ys = cell.x_bounds(COLS), cell.y_bounds(ROWS)
     out: list[Contour] = []
-    for row in range(ROWS):
-        for col in range(COLS):
-            if not _filled('medium', row, col):
-                continue
-            x0, x1, y0, y1 = xs[col], xs[col + 1], ys[ROWS - 1 - row], ys[ROWS - row]
-            piece = polygon(clip([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], *plane))
-            if piece:
-                out.append(piece)
+    for dot in dots(MEDIUM, range(MEDIUM.rows), range(MEDIUM.cols)):
+        piece = polygon(clip(dot, *plane))
+        if piece:
+            out.append(piece)
     return out
 
 

@@ -16,18 +16,9 @@ from fontTools.ttLib import TTFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from glyphs import cell, table
-from glyphs.families import dots, grid, shade, strokes, triangles
-from glyphs.families import round as round_
+from glyphs import cell, families, table
+from glyphs.families import shade
 
-FAMILIES = {
-    'grid': grid,
-    'dots': dots,
-    'strokes': strokes,
-    'triangles': triangles,
-    'round': round_,
-    'shade': shade,
-}
 ROOT = Path(__file__).resolve().parent.parent
 FONT_FILE = 'WebTerminalGlyphs.woff2'
 NOTICE = (
@@ -44,7 +35,51 @@ def glyph_name(cp: int) -> str:
     return f'uni{cp:04X}' if cp < 0x10000 else f'u{cp:04X}'
 
 
-def charstring(contours):
+STROKE_HEIGHTS = frozenset(cell.STROKE_UNITS.values())
+SHADE_DOT_HEIGHTS = frozenset(kind.dot[1] for kind in shade.KINDS.values())
+
+
+def stem_heights(entry: table.Entry) -> frozenset[int]:
+    """The rectangle heights that are horizontal stems in this glyph: a stroke width in any glyph,
+    a dot row in the shade dithers. Nothing else is hinted: the engine hints only the vertical
+    direction, and a block edge is left where it is (measured on `▀` beside `▄`)."""
+    return STROKE_HEIGHTS | SHADE_DOT_HEIGHTS if entry[0] == 'shade' else STROKE_HEIGHTS
+
+
+def hstems(contours, heights: frozenset[int]) -> list[tuple[int, int]]:
+    """Non-overlapping (bottom, height) horizontal stem hints, one per rectangle of a stem height.
+    The companion's box-drawing glyphs carry the same hints, and FreeType's CFF engine snaps a
+    hinted stem's edges to the device rows, so without them a junction's arm lands up to half a
+    row off the companion's dash at a fractional zoom. A heavy arm's stem contains a light arm's
+    on a mixed-weight junction; nested or overlapping spans are merged because Type 2 allows
+    overlap only under a hintmask."""
+    spans = set()
+    for contour in contours:
+        if len(contour) != 4 or any(len(seg) != 2 for seg in contour):
+            continue
+        xs, ys = {p[0] for p in contour}, {p[1] for p in contour}
+        if len(xs) == 2 and len(ys) == 2 and max(ys) - min(ys) in heights:
+            spans.add((min(ys), max(ys)))
+    merged: list[list[int]] = []
+    for lo, hi in sorted(spans):
+        if merged and lo <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], hi)
+        else:
+            merged.append([lo, hi])
+    return [(lo, hi - lo) for lo, hi in merged]
+
+
+def hint_program(contours, heights: frozenset[int]) -> list:
+    """`hstem` with the deltas Type 2 wants: each stem's bottom relative to the previous top."""
+    pos = 0
+    args: list[int] = []
+    for bottom, height in hstems(contours, heights):
+        args += [bottom - pos, height]
+        pos = bottom + height
+    return [*args, 'hstem'] if args else []
+
+
+def charstring(contours, heights: frozenset[int] = STROKE_HEIGHTS):
     pen = T2CharStringPen(width=cell.ADVANCE_UNITS, glyphSet=None)
     for contour in contours:
         pen.moveTo(contour[0])
@@ -54,7 +89,9 @@ def charstring(contours):
             else:
                 pen.curveTo(seg[0:2], seg[2:4], seg[4:6])
         pen.closePath()
-    return pen.getCharString()
+    cs = pen.getCharString()
+    cs.program[1:1] = hint_program(contours, heights)
+    return cs
 
 
 def ink_bounds(glyph_bounds) -> tuple[int, int, int, int]:
@@ -82,8 +119,8 @@ def build_font() -> tuple[FontBuilder, tuple[int, int, int, int]]:
     names = {cp: glyph_name(cp) for cp in codepoints}
     charstrings = {'.notdef': charstring([])}
     for cp in codepoints:
-        family, params = table.TABLE[cp]
-        charstrings[names[cp]] = charstring(FAMILIES[family].draw(params))
+        entry = table.TABLE[cp]
+        charstrings[names[cp]] = charstring(families.draw(entry), stem_heights(entry))
 
     fb = FontBuilder(unitsPerEm=cell.UPEM, isTTF=False)
     fb.setupGlyphOrder(['.notdef', *names.values()])
@@ -192,6 +229,10 @@ def write_cell_json(path: Path) -> None:
             'overhang': cell.OVERHANG_UNITS,
         },
         'stack': [cell.FAMILY_NAME, cell.COMPANION_FAMILY],
+        'rule': (
+            'The overlay draws only what the companion cannot tile at this cell; every other '
+            'codepoint falls through to the companion.'
+        ),
         'generated': table.generated_ranges(),
     }
     path.write_text(json.dumps(data, indent=2) + '\n')
