@@ -9,6 +9,7 @@ alone (the red check for the face-identity and seam oracles).
 
 import os
 import shutil
+import statistics
 import subprocess
 import sys
 import threading
@@ -33,6 +34,14 @@ COMPANION_FILES = tuple(
 FONT_FILE = 'WebTerminalGlyphs.woff2'
 DPRS = (1, 2)
 ZOOMS = (1.0, 1.1)
+SOLID_CELL = '\u2588'
+PROFILE_SPAN = 7
+# The share of the measured solid level a boundary pixel may lose before it counts as a seam.
+# Both poles measured: a correct build loses at most 2.0% (250/255 on the boundary column,
+# chromium 151 on the ubuntu-24.04 runner at DPR 1, zoom 1.1) while OVERHANG_UNITS = 0 loses 14.1%
+# at its shallowest across the three engines (Firefox, stacked half blocks, DPR 1, zoom 1.1) and
+# 88.6% at its deepest.
+MAX_BOUNDARY_LOSS = 0.05
 
 
 def pytest_configure(config) -> None:
@@ -44,6 +53,16 @@ def pytest_configure(config) -> None:
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *_):
         pass
+
+
+def profile(line: list[float], index: int) -> str:
+    """The ink either side of `index`, bracketed, with the rest of the line summarised: a seam is
+    one pixel deep, so its neighbours are the diagnosis and the far end is context."""
+    lo, hi = max(0, index - PROFILE_SPAN), min(len(line), index + PROFILE_SPAN + 1)
+    around = ' '.join(
+        f'[{v:.3f}]' if i + lo == index else f'{v:.3f}' for i, v in enumerate(line[lo:hi])
+    )
+    return f'{lo}..{hi - 1} {around} (line min {min(line):.3f}, len {len(line)})'
 
 
 def companion_dir() -> Path:
@@ -110,6 +129,7 @@ class Term:
     def __init__(self, page: Page, browser_name: str, dpr: int, zoom: float):
         self.page, self.browser_name, self.dpr, self.zoom = page, browser_name, dpr, zoom
         self.scale = dpr * zoom
+        self.solid: float | None = None
 
     def set_rows(self, cls: str, rows: list[list[str]]) -> None:
         self.page.evaluate('([cls, rows]) => window.setRows(cls, rows)', [cls, rows])
@@ -122,6 +142,38 @@ class Term:
 
     def png(self, selector: str) -> bytes:
         return self.page.locator(selector).screenshot(type='png')
+
+    def solid_level(self) -> float:
+        """The ink level this host, engine and scale paint a fully covered device pixel at,
+        sampled from inside one cell so neither a cell boundary nor the overhang enters it. It
+        replaces the page's rows, so read it through the `ink_floor` fixture rather than mid-test.
+        """
+        if self.solid is None:
+            self.set_rows('ov', [[SOLID_CELL]])
+            grid = pixels.crop_to_ink(self.ink('#block .row span'), 2)
+            self.solid = statistics.median(v for row in grid for v in row)
+        return self.solid
+
+    def diagnose(self, grid: list[list[float]], y: int, x: int, floor: float, sel: str) -> str:
+        """What a seam failure has to carry to be actionable from CI alone; `sel` names a node
+        carrying text, whose painting font is the other half of the diagnosis. Reads no page state
+        beyond that, so the caller's rows are still the ones measured."""
+        box = pixels.ink_box(grid)
+        lines = [
+            (
+                f'ink {grid[y][x]:.3f} at column {x}, row {y}, below floor {floor:.3f} '
+                f'(solid {self.solid_level():.3f} less {MAX_BOUNDARY_LOSS:.0%})'
+            ),
+            (
+                f'{self.browser_name} dpr{self.dpr} zoom{self.zoom}, ink box {box} '
+                f'in a {len(grid[0])}x{len(grid)} grid'
+            ),
+            f'row {y}: {profile(grid[y], x)}',
+            f'column {x}: {profile([row[x] for row in grid], y)}',
+        ]
+        if self.browser_name == 'chromium':
+            lines.append(f'painted by {", ".join(self.fonts(sel)) or "nothing"}')
+        return '\n'.join(lines)
 
     def fonts(self, selector: str) -> list[str]:
         """Chromium only: the platform font family names that painted the node."""
@@ -150,3 +202,14 @@ def term(
         page.add_style_tag(content='.term { font-family: "Monaspace Neon NF", monospace; }')
     yield Term(page, browser_name, dpr, zoom)
     page.close()
+
+
+@pytest.fixture
+def ink_floor(term: Term) -> float:
+    """The level a boundary pixel must reach to count as covered, measured in the same page and
+    run as the subject: an absolute threshold held here and failed on the ubuntu-24.04 runner,
+    where a correct build reads 250/255 on the boundary column that reads 255/255 locally.
+
+    A fixture, not a call in the test body, because measuring it replaces the page's rows.
+    """
+    return term.solid_level() * (1 - MAX_BOUNDARY_LOSS)

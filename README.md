@@ -73,7 +73,7 @@ The glyphs are drawn for one cell and are wrong for any other. `cell.json`
 states it:
 
 | Field | Value | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `companion.family` | `Monaspace Neon NF` | the text face the glyphs are paired with |
 | `companion.advance` | 1240 / 2000 em | every glyph here has the same advance, so no cell is padded |
 | `companion.ascender`, `descender`, `lineGap` | 1890 / −400 / 200 | copied into this font, because Gecko takes the line box from the first family in the stack |
