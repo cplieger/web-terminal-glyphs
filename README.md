@@ -1,7 +1,7 @@
 # web-terminal-glyphs
 
 [![License](https://img.shields.io/github/license/cplieger/web-terminal-glyphs)](LICENSE)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/PROJECT_ID/badge)](https://www.bestpractices.dev/projects/PROJECT_ID)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14653/badge)](https://www.bestpractices.dev/projects/14653)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/web-terminal-glyphs/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/web-terminal-glyphs)
 
 > Terminal tiling glyphs drawn for one cell, as a web font that sits in front of your text face
