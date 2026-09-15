@@ -58,9 +58,16 @@ def _unfilter(filter_type: int, line: bytearray, prev: bytearray, bpp: int) -> N
 
 
 def ink(image: Image) -> list[list[float]]:
-    """Grey level 0..1 per pixel, the weakest colour channel, so "full ink" means every channel
-    is within 1/255 of the glyph colour."""
+    """Grey level 0..1 per pixel, the weakest colour channel, so a pixel reads as fully covered
+    only when every channel does."""
     return [[min(r, g, b) / 255 for r, g, b, _ in row] for row in image]
+
+
+def ink_box(grid: list[list[float]]) -> tuple[int, int, int, int]:
+    """(x0, y0, x1, y1) of the pixels at half ink or more."""
+    cells = [(x, y) for y, row in enumerate(grid) for x, v in enumerate(row) if v >= 0.5]
+    xs, ys = [x for x, _ in cells], [y for _, y in cells]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def correlation(grid: list[list[float]], lag: float, *, vertical: bool) -> float:

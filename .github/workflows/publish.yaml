@@ -45,11 +45,16 @@ jobs:
         run: uv run scripts/build.py
       - name: Geometry invariants
         run: uv run pytest tests/geometry -q
-      # No --with-deps: ubuntu-24.04 already carries every shared library the
-      # three browsers link, and the flag's apt transaction adds only fonts over
-      # a mirror that has trickled at 23 kB/s for 15 minutes.
-      - name: Install browsers
-        run: uv run playwright install chromium firefox webkit
+      # --with-deps is needed for firefox and webkit and not for chromium:
+      # ubuntu-24.04 carries every shared library chromium links, but webkit
+      # needs about forty more (the gstreamer, flite, libmanette and libhyphen
+      # sets), and without them both engines fail to launch and take a third of
+      # the matrix with them. Chromium is installed separately so a browser that
+      # needs no apt transaction does not wait on one.
+      - name: Install chromium
+        run: uv run playwright install chromium
+      - name: Install firefox and webkit
+        run: uv run playwright install --with-deps firefox webkit
       - name: Fetch the companion faces
         run: bash scripts/fetch-companion.sh "$RUNNER_TEMP/monaspace"
       - name: Render matrix
