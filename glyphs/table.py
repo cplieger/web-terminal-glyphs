@@ -70,7 +70,7 @@ def fraction_box(text: str) -> tuple[int, int, int, int]:
     words = text.removesuffix(' BLOCK').split()
     starts = [i for i, w in enumerate(words) if w in SIDES] + [len(words)]
     for a, b in pairwise(starts):
-        side, num, den = words[a], *FRACTIONS[' '.join(words[a + 1 : b])]
+        side, (num, den) = words[a], FRACTIONS[' '.join(words[a + 1 : b])]
         if side == 'LEFT':
             x1 = cell.x_bounds(den)[num]
         elif side == 'RIGHT':
