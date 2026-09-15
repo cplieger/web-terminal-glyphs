@@ -4,8 +4,11 @@ fractional blocks on that lattice and overhang its outer edges by 72.
 Tolerances per family: the lattice pitch is 2428 units for a 2428.57-unit row while the frame top
 rounds up to 1929, so a pattern may stop 1 unit short of the top. Braille dots are inset a quarter
 pitch from their lattice cell (155 horizontally, 151 vertically), so the dot ink is that much
-inside the cell on every side.
+inside the cell on every side. The shade dots are the companion's 138 x 155 and 138 x 159, centred
+in their lattice cells, so their bounds sit inside the cell by half the slack of a lattice cell.
 """
+
+from itertools import pairwise
 
 import pytest
 
@@ -23,16 +26,12 @@ SEXTANT_PIECES = {
     0x1FB0F: (-72, -572, 620, 309),
     0x1FB1E: (620, -572, 1312, 309),
 }
-SHADE_ROWS = [
-    (-500, -196),
-    (-196, 107),
-    (107, 411),
-    (411, 714),
-    (714, 1018),
-    (1018, 1321),
-    (1321, 1625),
-    (1625, 1928),
-]
+LIGHT_SHADE = (34, -426, 1205, 1854)
+MEDIUM_SHADE = (8, -493, 1231, 1921)
+LIGHT_DOT, MEDIUM_DOT = (138, 155), (138, 159)
+LIGHT_COLUMNS = {34, 241, 447, 654, 861, 1067}
+LIGHT_ROWS = {-426, -122, 181, 485, 788, 1092, 1395, 1699}
+LATTICE_HEIGHT = 2428
 # The eight single octant pieces (1, 2, 7 and 8 live among the quarter blocks) and the internal
 # grid lines their edges land on: (codepoint, x-edge, (y-edge, y-edge)); x = 620, y = 107, 714, 1321.
 OCTANT_PIECES = [
@@ -52,13 +51,19 @@ def close(actual, expected, tolerance):
 
 
 @pytest.mark.parametrize(
-    'codepoint',
-    [0x2591, 0x2592, 0x2593, 0x1FB95, 0x1FB96],
+    ('codepoint', 'expected'),
+    [
+        (0x2591, LIGHT_SHADE),
+        (0x2592, MEDIUM_SHADE),
+        (0x2593, OVERHUNG),
+        (0x1FB95, CELL),
+        (0x1FB96, CELL),
+    ],
     ids=['light-shade', 'medium-shade', 'dark-shade', 'checker', 'inverse-checker'],
 )
-def test_pattern_lattice_bbox_is_the_cell(bounds, codepoint):
+def test_pattern_lattice_bbox(bounds, codepoint, expected):
     box = bounds(codepoint)
-    assert close(box, CELL, (0, 0, 0, 1)), box
+    assert close(box, expected, (0, 0, 0, 1)), box
 
 
 @pytest.mark.parametrize(
@@ -75,8 +80,47 @@ def test_sextant_rows_are_809_810_809(bounds, codepoint, expected):
     assert bounds(codepoint) == expected
 
 
-def test_shade_rows_alternate_304_303_from_the_bottom(contour_boxes):
-    assert sorted({(y0, y1) for _, y0, _, y1 in contour_boxes(0x2591)}) == SHADE_ROWS
+def dot_lattice(boxes):
+    sizes = {(x1 - x0, y1 - y0) for x0, y0, x1, y1 in boxes}
+    columns = sorted({x0 for x0, _, _, _ in boxes})
+    rows = sorted({y0 for _, y0, _, _ in boxes})
+    return sizes, columns, rows
+
+
+def test_light_shade_is_the_companions_dots_on_a_6x8_checkerboard(contour_boxes):
+    """Mutation: the companion's own ░ has rows 311 apart, so its top row sits 196 units below the
+    next cell's bottom row; on the lattice the seam pitch equals the interior pitch."""
+    dots = contour_boxes(0x2591)
+    sizes, columns, rows = dot_lattice(dots)
+    assert len(dots) == 24
+    assert sizes == {LIGHT_DOT}
+    assert (set(columns), set(rows)) == (LIGHT_COLUMNS, LIGHT_ROWS)
+    for x0, y0, _, _ in dots:
+        assert (rows.index(y0) + columns.index(x0)) % 2 == 1, (x0, y0)
+    seam_pitch = rows[0] + LATTICE_HEIGHT - rows[-1]
+    interior = {b - a for a, b in pairwise(rows)}
+    assert seam_pitch in interior, (seam_pitch, interior)
+
+
+def test_medium_shade_is_the_companions_dots_on_an_8x14_checkerboard(contour_boxes):
+    dots = contour_boxes(0x2592)
+    sizes, columns, rows = dot_lattice(dots)
+    assert len(dots) == 56
+    assert sizes == {MEDIUM_DOT}
+    assert (len(columns), len(rows)) == (8, 14)
+    assert columns[0] == 8
+    for x0, y0, _, _ in dots:
+        assert (rows.index(y0) + columns.index(x0)) % 2 == 0, (x0, y0)
+    seam_pitch = rows[0] + LATTICE_HEIGHT - rows[-1]
+    interior = {b - a for a, b in pairwise(rows)}
+    assert seam_pitch in interior, (seam_pitch, interior)
+
+
+def test_dark_shade_is_the_full_block_minus_the_light_dots(contour_boxes):
+    boxes = contour_boxes(0x2593)
+    assert len(boxes) == 25
+    assert boxes[0] == OVERHUNG
+    assert boxes[1:] == contour_boxes(0x2591)
 
 
 def test_braille_dots_fill_the_cell_minus_the_dot_inset(bounds):

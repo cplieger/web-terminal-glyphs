@@ -79,7 +79,8 @@ states it:
 | `companion.ascender`, `descender`, `lineGap` | 1890 / −400 / 200 | copied into this font, because Gecko takes the line box from the first family in the stack |
 | `cell.fontSize`, `cell.lineHeight` | 14 / 17 | the only ratio the glyphs tile at |
 | `cell.overhang` | 72 units | how far a solid glyph extends past a cell edge so adjacent cells leave no seam |
-| `generated` | 1,098 codepoints | the ranges this font answers for |
+| `generated` | 1,075 codepoints | the ranges this font answers for |
+| `rule` | a sentence | the overlay draws only what the companion cannot tile |
 
 Gate on it at build time: compare `cell.json` against the CSS you ship and
 against the companion file you vendor. A companion release that changes its
@@ -100,6 +101,28 @@ and a handful of Geometric Shapes.
 Six geometry families cover it: grid fills, dot grids, stroke sets, triangles,
 rounded shapes and shades. Every glyph is drawn from a table entry, so a new
 range is a table change and a rebuild.
+
+The overlay draws only what the companion cannot tile at the declared cell. Of
+the 1,098 codepoints the tables know, Monaspace Neon NF lacks 901; of the 197 it
+has, 23 tile and are left to the companion with no entry in this font: the
+twelve box-drawing dashes, the three circles and the six arc spinners touch no
+cell edge, and the two downward stubs `╷ ╻` touch only the bottom edge, where
+anything that inks the top edge from below is one of ours and covers the seam
+(a glyph that inks nothing there leaves no seam to cover). The other 174 do not
+tile, measured: the companion's frame passes the left and right cell edges by 10
+units and stops 29 short of the top, so a run of its own `─` or `█` reads 0.81
+of solid on every boundary column at DPR 1 and 0.43 at DPR 2 zoom 1.1. Those
+are drawn here. The ones that meet a companion glyph take its measured
+coordinates so the join is flush: strokes, rails and arcs sit on Monaspace's
+stroke midline (y 645) at its stroke widths, because a `┼` of ours meets a `┄`
+of Monaspace's; the shades keep its dot size and checkerboard phase with the
+rows re-pitched to divide the cell. Everything else keeps this font's own
+geometry (the half blocks and eighth bars split the cell evenly at its lattice
+centre, y 714). The horizontal strokes and shade dot rows carry `hstem` hints
+like Monaspace's, so both fonts snap to the same device rows. The set is a
+committed constant in `glyphs/companion.py`; the render tier recomputes it from
+the companion file and fails when a companion release moves a glyph across the
+rule.
 
 ## Building
 

@@ -2,9 +2,12 @@
 from two fixtures rendered in the same page: the overlay alone (good) and the companion alone
 (bad); the subject is the production .term stack.
 
-Pattern lattices (braille, the three shades) score the correlation of the grid with itself
-shifted by the glyph's own period, on the weaker of the two axes: a pattern that continues across
-cells scores near 1, one whose period does not divide the cell drops at every seam. Mosaic fills
+The braille lattice scores the correlation of the grid with itself shifted by the glyph's own
+period, on the weaker of the two axes: a pattern that continues across cells scores near 1, one
+whose period does not divide the cell drops at every seam. The three shades left this test when
+they took the companion's one-pixel dots: a correlation at a fractional lag interpolates a
+1 px dot into noise and reads the same for a lattice that tiles and one that does not (measured
+0.756 against 0.757 for the light shade at DPR 2); `test_shade.py` measures them another way. Mosaic fills
 (octant 2345678, sextant 23456) tile into a solid field with one notch per cell; they score the
 share of the grid at the run's own `ink_floor`, and a seam is the extra check: a pixel below that
 floor between two neighbours above it, which is what a boundary column at two partial coverages
@@ -17,14 +20,8 @@ import pytest
 from tests.render import pixels
 
 UNIT_PX = 14 / 2000
-# Own period (vertical, horizontal) in font units: the octant pitch 607 x 620; the 25% and 75%
-# dithers repeat every four 303.5-unit rows and every cell horizontally.
-PERIODIC = {
-    '\u28ff': (607, 620),
-    '\u2591': (1214, 1240),
-    '\u2592': (607, 620),
-    '\u2593': (1214, 1240),
-}
+# Own period (vertical, horizontal) in font units: the octant pitch 607 x 620.
+PERIODIC = {'\u28ff': (607, 620)}
 SOLID = ['\U0001cde5', '\U0001fb3b']
 GRID = 6
 # Smallest separation measured across the three engines at DPR 1 and 2, zoom 1.0 and 1.1: 0.07,

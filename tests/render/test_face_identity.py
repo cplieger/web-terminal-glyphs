@@ -9,11 +9,12 @@ COMPANION = 'Monaspace Krypton Var'
 # One glyph per generated range, in the design's order.
 SAMPLES = [
     '\u2500',
-    '\u25c9',
-    '\u25cb',
-    '\u25cf',
+    '\u250c',
+    '\u2550',
+    '\u2578',
+    '\u257c',
     '\u25d6',
-    '\u25dc',
+    '\u25e2',
     '\u28ff',
     '\ue0b0',
     '\ue0d6',
@@ -26,6 +27,9 @@ SAMPLES = [
     '\U0001ce51',
     '\uf5d0',
 ]
+# One codepoint the companion tiles per group it tiles in: a light and a heavy dash, a double dash,
+# a downward stub, a white circle and an arc spinner.
+DROPPED = ['\u2504', '\u2509', '\u254c', '\u2577', '\u25cb', '\u25dc']
 
 
 def span(index: int) -> str:
@@ -45,6 +49,22 @@ def test_overlay_paints_every_generated_range(term):
     for i, sample in enumerate(SAMPLES):
         assert with_overlay[i] != term.png(span(i)), (
             f'U+{ord(sample):04X} renders the same without the overlay'
+        )
+
+
+def test_companion_paints_every_dropped_range(term):
+    """Mutation: an overlay that still carried a companion-tiled codepoint would win the cell,
+    moving Chromium's answer to the overlay and changing the .term screenshot against .base."""
+    term.set_rows('term', [DROPPED])
+    if term.browser_name == 'chromium':
+        for i, sample in enumerate(DROPPED):
+            assert term.fonts(span(i)) == [COMPANION], (sample, term.fonts(span(i)))
+        return
+    with_overlay = [term.png(span(i)) for i in range(len(DROPPED))]
+    term.set_rows('base', [DROPPED])
+    for i, sample in enumerate(DROPPED):
+        assert with_overlay[i] == term.png(span(i)), (
+            f'U+{ord(sample):04X} renders differently with the overlay in the stack'
         )
 
 

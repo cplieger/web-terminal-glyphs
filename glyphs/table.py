@@ -5,7 +5,7 @@ hand-listed for the PUA ranges (Powerline, Fira progress, kitty branch drawing).
 import unicodedata
 from itertools import pairwise
 
-from glyphs import cell
+from glyphs import cell, companion
 
 Entry = tuple[str, dict]
 
@@ -333,8 +333,8 @@ STUBS = {
     ],
 }
 QUARTER_BLOCKS = {
-    0x1FBE4: (XS4[1], XS4[3], cell.MIDLINE_Y, cell.LATTICE_TOP_UNITS),
-    0x1FBE5: (XS4[1], XS4[3], cell.BOTTOM_UNITS, cell.MIDLINE_Y),
+    0x1FBE4: (XS4[1], XS4[3], cell.CENTRE_Y, cell.LATTICE_TOP_UNITS),
+    0x1FBE5: (XS4[1], XS4[3], cell.BOTTOM_UNITS, cell.CENTRE_Y),
     0x1FBE6: (0, cell.CENTRE_X, Y_LOW, Y_HIGH),
     0x1FBE7: (cell.CENTRE_X, cell.ADVANCE_UNITS, Y_LOW, Y_HIGH),
 }
@@ -527,7 +527,9 @@ def build() -> dict[int, Entry]:
     return table
 
 
-TABLE = build()
+CANDIDATES = build()
+# What ships: every candidate the companion cannot tile at this cell.
+TABLE = {cp: entry for cp, entry in CANDIDATES.items() if cp not in companion.TILES}
 
 
 def generated_ranges() -> list[str]:

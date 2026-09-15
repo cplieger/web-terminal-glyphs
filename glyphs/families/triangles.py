@@ -51,7 +51,7 @@ def arrow(direction: str, *, inverted: bool = False) -> list[Contour]:
     the two corner triangles left over."""
     apex_x = cell.ADVANCE_UNITS if direction == 'e' else 0
     base_x = 0 if direction == 'e' else cell.ADVANCE_UNITS
-    apex = (apex_x, cell.MIDLINE_Y)
+    apex = (apex_x, cell.CENTRE_Y)
     top, bottom = (base_x, cell.LATTICE_TOP_UNITS), (base_x, cell.BOTTOM_UNITS)
     if not inverted:
         return [_solid([bottom, top, apex], pin=apex)]
