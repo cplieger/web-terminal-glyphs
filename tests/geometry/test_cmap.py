@@ -1,11 +1,11 @@
-# The candidate ranges minus the codepoints the companion tiles (glyphs/companion.py).
+# The candidate ranges minus what is left to the companion (glyphs/companion.py:
+# LEFT_TO_COMPANION, i.e. the measured TILES plus the judged NO_DESIGN_GAP).
 GENERATED = [
     '2500-2503',
     '250C-254B',
     '2550-2576',
     '2578-257A',
     '257C-259F',
-    '25D6-25D7',
     '25E2-25E5',
     '2800-28FF',
     'E0B0-E0BF',
@@ -31,7 +31,7 @@ def expand(ranges: list[str]) -> set[int]:
 
 def test_cmap_is_exactly_the_generated_set(cmap):
     assert set(cmap) == expand(GENERATED)
-    assert len(cmap) == 1075
+    assert len(cmap) == 1073
 
 
 def test_no_space_glyph(cmap):

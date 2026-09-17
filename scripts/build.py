@@ -230,8 +230,9 @@ def write_cell_json(path: Path) -> None:
         },
         'stack': [cell.FAMILY_NAME, cell.COMPANION_FAMILY],
         'rule': (
-            'The overlay draws only what the companion cannot tile at this cell; every other '
-            'codepoint falls through to the companion.'
+            'The overlay draws only what the companion cannot tile at this cell, and nothing '
+            'the companion already draws at the right shape; every other codepoint falls '
+            'through to the companion.'
         ),
         'generated': table.generated_ranges(),
     }

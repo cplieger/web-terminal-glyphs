@@ -67,3 +67,16 @@ TILES = frozenset(
         0x25E1,
     ]
 )
+
+
+# Codepoints the companion draws at the right shape for their meaning, so the overlay draws
+# nothing. Judged rather than measured, and kept out of TILES so that set stays recomputable from
+# the companion's own bounds.
+#
+# U+25D6/25D7 are the halves of a black circle, and the overlay's only half-disc is `half_disc`,
+# the Powerline separator: cell-spanning so it meets the block beside it, 1312x2573 units against
+# the companion's 601x1212. U+E0B4..E0B7 keep it.
+NO_DESIGN_GAP = frozenset([0x25D6, 0x25D7])
+
+# The one set the generator subtracts.
+LEFT_TO_COMPANION = TILES | NO_DESIGN_GAP

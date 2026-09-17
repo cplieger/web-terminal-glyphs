@@ -529,7 +529,7 @@ def build() -> dict[int, Entry]:
 
 CANDIDATES = build()
 # What ships: every candidate the companion cannot tile at this cell.
-TABLE = {cp: entry for cp, entry in CANDIDATES.items() if cp not in companion.TILES}
+TABLE = {cp: entry for cp, entry in CANDIDATES.items() if cp not in companion.LEFT_TO_COMPANION}
 
 
 def generated_ranges() -> list[str]:
