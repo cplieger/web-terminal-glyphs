@@ -60,6 +60,18 @@ if gh release view "$next" --repo "$REPO" >/dev/null 2>&1; then
 fi
 
 sha="$(git rev-parse HEAD)"
+branch="${GITHUB_REF_NAME:-main}"
+head="$(gh api "repos/${REPO}/git/ref/heads/${branch}" --jq '.object.sha')"
+if [ "$sha" != "$head" ]; then
+  # A push landed while this run was building, so the run for that commit cuts
+  # this version from a tree containing ours. Tagging here would fail anyway:
+  # the Actions token may not create a tag at a commit the branch has moved
+  # past once the newer commits touch .github/workflows, and `permissions:`
+  # cannot grant the `workflows` scope that would allow it.
+  echo "release: ${branch} moved to ${head}; the run for that commit cuts ${next}"
+  exit 0
+fi
+
 gh api --method POST "repos/${REPO}/git/refs" --raw-field ref="refs/tags/${next}" --raw-field sha="$sha" >/dev/null
 gh release create "$next" "$DIST"/WebTerminalGlyphs.woff2 "$DIST"/cell.json "$DIST"/LICENSE "$DIST"/NOTICE \
   --repo "$REPO" --title "$next" --notes "$notes" --latest
