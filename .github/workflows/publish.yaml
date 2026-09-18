@@ -24,9 +24,14 @@ on:
 permissions:
   contents: read
 
+# A superseded run has nothing of its own to cut: the version comes from every
+# commit since the last tag and the assets are built from the tree, so the newer
+# run publishes a superset. Cancelling also avoids a tag create the Actions token
+# cannot perform, since a tag at a commit the branch has moved past needs the
+# `workflows` scope whenever the newer commits touch .github/workflows.
 concurrency:
   group: publish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:

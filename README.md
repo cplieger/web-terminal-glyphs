@@ -28,6 +28,7 @@ Fetch the release assets and serve them beside your text face:
 https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/WebTerminalGlyphs.woff2
 https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/cell.json
 https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/LICENSE
+https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/NOTICE
 ```
 
 Pin a release tag and a SHA-256 in an image build rather than `latest`;
