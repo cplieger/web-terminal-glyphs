@@ -21,11 +21,6 @@ from glyphs.families import shade
 
 ROOT = Path(__file__).resolve().parent.parent
 FONT_FILE = 'WebTerminalGlyphs.woff2'
-NOTICE = (
-    'Web Terminal Glyphs\n'
-    f'{cell.COPYRIGHT}\n\n'
-    "Generated from this repository's geometry tables. Contains no glyph outlines from any other font.\n"
-)
 USE_TYPO_METRICS = 1 << 7
 BUILD_TIMESTAMP = timestampFromString('Thu Jan  1 00:00:00 2026')
 REGULAR = 1 << 6
@@ -254,7 +249,7 @@ def main() -> None:
     else:
         print('warning: no LICENSE at the repo root; writing a placeholder', file=sys.stderr)
         (dist / 'LICENSE').write_text(f'{cell.LICENSE_ID}: {cell.LICENSE_URL}\n')
-    (dist / 'NOTICE').write_text(NOTICE)
+    (dist / 'NOTICE').write_bytes((ROOT / 'NOTICE').read_bytes())
     print(
         f'{len(table.TABLE)} glyphs, {font_path.stat().st_size} bytes, ink bounds x [{bounds[0]}, {bounds[2]}] y [{bounds[1]}, {bounds[3]}]'
     )
