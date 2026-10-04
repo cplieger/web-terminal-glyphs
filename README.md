@@ -2,27 +2,30 @@
 
 [![License](https://img.shields.io/github/license/cplieger/web-terminal-glyphs)](LICENSE)
 
-> Terminal tiling glyphs drawn for one cell, as a web font that sits in front of your text face
+web-terminal-glyphs is a 12 KB web font that makes box drawing, block elements, shades and braille tile with no gaps in a browser terminal. It sits in front of Monaspace Neon NF in the terminal's font stack and draws only the glyphs that must join their neighbours. Anyone can use it, under the Apache-2.0 license.
 
-A browser terminal renders each cell as a piece of text, so box-drawing lines,
-block elements, shades, braille and the newer Unicode mosaic blocks come from
-the font. A font does not know the cell it will be placed in, and the glyphs in
-a text face are drawn for its own line box: at the cell a terminal actually
-uses they leave seams between rows, lattices whose period does not divide the
-row, and fallback substitutions per device for the ranges the face lacks.
-Native terminals answer that by painting these ranges themselves. A DOM
-terminal cannot, because the painted pixels are also the text a user selects
-and copies.
+![A btop-style dashboard in a browser terminal with box drawing, bars, braille graphs and a Powerline prompt, beside 3x crops of the same blocks drawn with Monaspace Neon NF alone and with web-terminal-glyphs](docs/images/header.png)
 
-`Web Terminal Glyphs` is the other answer: one small font holding only the
-glyphs that have to tile, generated from geometry for a declared cell, and
-listed first in the `font-family` stack so the browser takes them from here and
-everything else from the text face behind it. It carries no letters, no digits
-and no space, so the text face keeps its metrics, its line box and its look.
+## What it does
+
+web-terminal-glyphs gives a text-rendered browser terminal the unbroken lines and solid blocks a native terminal paints itself:
+
+- Box-drawing lines, blocks, shades and braille meet the next row and column with no seam.
+- Text selection and copy keep working, because every cell stays text.
+- Letters, digits and spaces still come from Monaspace Neon NF, with its own metrics and look.
+- One file covers 1,073 codepoints in Box Drawing, Block Elements, Braille, Powerline and the Legacy Computing blocks.
+
+## Who it is for
+
+web-terminal-glyphs is built for a DOM-rendered browser terminal, one whose cells are real text rather than a canvas. It expects Monaspace Neon NF at a 14px font on a 17px row. It is tested in Chromium, Firefox and WebKit at device pixel ratio 1 and 2. [web-terminal-ui](https://github.com/cplieger/web-terminal-ui) uses it in that setup. You need to serve Monaspace Neon NF as a web font beside it, in each weight and style your terminal uses, from a stylesheet you control.
+
+The glyphs are drawn for that cell only, so the release has no OTF or TTF for desktop use. A native terminal's cell is whatever its own font size and line height produce, so an installed font would be subtly wrong at nearly every setting.
+
+Consider the canvas or WebGL renderer of [xterm.js](https://xtermjs.org/docs/api/terminal/interfaces/iterminaloptions/) if your terminal can draw its cells on a canvas. Its `customGlyphs` option, on by default, draws box drawing and block elements itself, so lines stay continuous even with a custom line height.
 
 ## Install
 
-Fetch the release assets and serve them beside your text face:
+The font is published as four release assets. Fetch them and serve them beside your text face:
 
 ```text
 https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/WebTerminalGlyphs.woff2
@@ -31,19 +34,11 @@ https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/LICENSE
 https://github.com/cplieger/web-terminal-glyphs/releases/latest/download/NOTICE
 ```
 
-Pin a release tag and a SHA-256 in an image build rather than `latest`;
-the asset bytes never change under a tag.
-
-**woff2 only, and no desktop format on purpose.** The outlines are drawn for one
-cell, and a native terminal's cell is whatever its own font size and line height
-produce, so an installed OTF would be subtly wrong at nearly every setting and
-wrong in a way that reads as a font bug. The cell contract can only be honoured
-where the cell is declared, which is a browser stylesheet.
+In an image build, pin a release tag and a SHA-256 rather than `latest`. The asset bytes never change under a tag.
 
 ## Usage
 
-Declare the font once per weight and style you use, all pointing at the same
-file, and put the family first in the stack of the element that renders cells:
+Declare the font once for each weight and style you use, all pointing at the same file. Then put the family first in the font stack of the element that renders cells:
 
 ```css
 @font-face {
@@ -63,71 +58,30 @@ file, and put the family first in the stack of the element that renders cells:
 }
 ```
 
-The four exact declarations keep every browser from synthesising a bold or an
-oblique for the one upright design; box drawing must never slant or thicken.
+The four exact declarations keep every browser from synthesising a bold or an oblique of the one upright design. Box drawing must never slant or thicken.
 
 ## The cell contract
 
-The glyphs are drawn for one cell and are wrong for any other. `cell.json`
-states it:
+The glyphs are drawn for one cell and are wrong for any other. `cell.json` ships beside the font and states that cell. Sizes are in font units, 2000 to the em.
 
 | Field | Value | Meaning |
 | --- | --- | --- |
 | `companion.family` | `Monaspace Neon NF` | the text face the glyphs are paired with |
-| `companion.advance` | 1240 / 2000 em | every glyph here has the same advance, so no cell is padded |
-| `companion.ascender`, `descender`, `lineGap` | 1890 / −400 / 200 | copied into this font, because Gecko takes the line box from the first family in the stack |
+| `companion.advance` | 1240 / 2000 em | the advance every glyph here shares, so no cell is padded |
+| `companion.ascender`, `descender`, `lineGap` | 1890 / -400 / 200 | copied from the companion, because Firefox sizes each row from the first font in the stack |
 | `cell.fontSize`, `cell.lineHeight` | 14 / 17 | the only ratio the glyphs tile at |
-| `cell.overhang` | 72 units | how far a solid glyph extends past a cell edge so adjacent cells leave no seam |
+| `cell.overhang` | 72 units | how far a solid glyph reaches past a cell edge, so neighbouring cells leave no seam |
+| `stack` | this font, then the companion | the `font-family` order the glyphs expect |
 | `generated` | 1,073 codepoints | the ranges this font answers for |
 | `rule` | a sentence | what this font draws, and what it leaves to the companion |
 
-Gate on it at build time: compare `cell.json` against the CSS you ship and
-against the companion file you vendor. A companion release that changes its
-advance or metrics, or a stylesheet that changes the cell, is a failing build,
-not a visual regression discovered on a phone.
+Gate on it at build time. Compare `cell.json` against the CSS you ship and against the companion file you vendor. A companion release that changes its advance or metrics, or a stylesheet that changes the cell, then fails the build instead of showing up as a visual bug on a phone.
 
 ## What is generated
 
-The set is the one [kitty](https://github.com/kovidgoyal/kitty) draws itself,
-which is the most complete of the eleven terminals surveyed: Box Drawing and
-Block Elements (U+2500–259F), Braille (U+2800–28FF), Symbols for Legacy
-Computing (U+1FB00–1FBAE, U+1FBCE–1FBEF), the Legacy Computing Supplement's
-octants and separated blocks (U+1CC1B–1CC3F, U+1CD00–1CDE5, U+1CE16–1CE19,
-U+1CE51–1CEAF), Powerline arrows (U+E0B0–E0BF, U+E0D6–E0D7), Fira Code's
-progress glyphs (U+EE00–EE0B), kitty's branch-drawing glyphs (U+F5D0–F60D)
-and a handful of Geometric Shapes.
+The set follows the glyphs [kitty](https://github.com/kovidgoyal/kitty) draws itself. Beyond the blocks named above, it covers Fira Code's progress glyphs, kitty's branch-drawing glyphs and four Geometric Shapes triangles. Every glyph comes from a table entry, so a new range is a table change and a rebuild.
 
-Six geometry families cover it: grid fills, dot grids, stroke sets, triangles,
-rounded shapes and shades. Every glyph is drawn from a table entry, so a new
-range is a table change and a rebuild.
-
-The overlay draws only what the companion cannot tile at the declared cell, and
-nothing the companion already draws at the right shape. Of the 1,098 codepoints
-the tables know, Monaspace Neon NF lacks 901; of the 197 it has, 23 tile and are
-left to the companion with no entry in this font: the
-twelve box-drawing dashes, the three circles and the six arc spinners touch no
-cell edge, and the two downward stubs `╷ ╻` touch only the bottom edge, where
-anything that inks the top edge from below is one of ours and covers the seam
-(a glyph that inks nothing there leaves no seam to cover). Two more are left to
-it for a different reason: `◖ ◗` are the halves of a black circle, and the only
-half-disc here is the Powerline separator, drawn to span the cell so it meets the
-block beside it: the right shape for `U+E0B4`..`U+E0B7`, which keep it, and the
-wrong one for a text symbol, since ours spans the cell at 1312 units against the
-companion's 601. The other 172 do not tile either, measured: the companion's
-frame passes the left and right cell edges by 10 units and stops 29 short of the
-top, so a run of its own `─` or `█` reads 0.81 of solid on every boundary column
-at DPR 1 and 0.43 at DPR 2 zoom 1.1. Those are drawn here. The ones that meet a
-companion glyph take its measured
-coordinates so the join is flush: strokes, rails and arcs sit on Monaspace's
-stroke midline (y 645) at its stroke widths, because a `┼` of ours meets a `┄`
-of Monaspace's; the shades keep its dot size and checkerboard phase with the
-rows re-pitched to divide the cell. Everything else keeps this font's own
-geometry (the half blocks and eighth bars split the cell evenly at its lattice
-centre, y 714). The horizontal strokes and shade dot rows carry `hstem` hints
-like Monaspace's, so both fonts snap to the same device rows. The set is a
-committed constant in `glyphs/companion.py`; the render tier recomputes it from
-the companion file and fails when a companion release moves a glyph across the
-rule.
+This font draws only what Monaspace Neon NF cannot tile at the declared cell. The glyph tables cover 1,098 codepoints, and Monaspace lacks 901 of them, so this font draws those. Monaspace has the other 197. It keeps 25 that already tile or are text symbols, and this font draws the remaining 172. Most of Monaspace's lines and blocks do not reach far enough past the cell edge to cover the boundary pixel. [How it works](docs/how-it-works.md) lists the ranges, the measurements and the rules each glyph follows.
 
 ## Building
 
@@ -137,30 +91,31 @@ uv run pytest tests/geometry     # invariants on the built font
 uv run pytest tests/render       # Chromium, Firefox and WebKit through Playwright
 ```
 
-The build needs Python 3.14 or newer: the glyph table derives the Legacy
-Computing Supplement entries from `unicodedata` names, and those exist from
-Unicode 16.0, which is the database Python 3.14 ships (3.13 carries 15.1).
+The build needs Python 3.14 or newer. The glyph table derives the Legacy Computing Supplement entries from `unicodedata` names, and those exist from Unicode 16.0, the database Python 3.14 ships. Python 3.13 carries Unicode 15.1.
 
-The render tests need `uv run playwright install chromium firefox webkit`
-once, and the companion face to pair against: set `MONASPACE_DIR` to a
-directory holding the four `MonaspaceNeonNF-{Regular,Bold,Italic,BoldItalic}.woff2`
-files from a [Monaspace release](https://github.com/githubnext/monaspace/releases).
-The session copies them into `tests/fixtures/base/` on start and deletes
-the copy on exit; the repository never commits Monaspace, and the build
-never reads it.
+The render tests need `uv run playwright install chromium firefox webkit` once. On a fresh Ubuntu machine, Firefox and WebKit also need `--with-deps`. The tests run each engine at device pixel ratio 1 and 2 and page zoom 1.0 and 1.1.
+
+They also need the companion face to pair against. Set `MONASPACE_DIR` to a folder holding the four `MonaspaceNeonNF-{Regular,Bold,Italic,BoldItalic}.woff2` files from a [Monaspace release](https://github.com/githubnext/monaspace/releases). `bash scripts/fetch-companion.sh <dir>` downloads them and checks their pinned SHA-256 digests. The test session copies them into `tests/fixtures/base/` at start and deletes the copy at exit. The repository never commits Monaspace, and the build never reads it.
+
+The cell and the companion's measurements are constants in `glyphs/cell.py` and `glyphs/companion.py`. To use another text face or cell size, fork the repository and change them.
 
 ## Related projects
 
-- [web-terminal-engine](https://github.com/cplieger/web-terminal-engine): the
-  VT engine and wire protocol whose renderer these glyphs are drawn for.
-- [web-terminal-ui](https://github.com/cplieger/web-terminal-ui): the browser
-  UI that declares the cell and ships the stylesheet this font pairs with.
-- [Monaspace](https://github.com/githubnext/monaspace): the companion text
-  face, consumed unmodified.
+- [web-terminal-engine](https://github.com/cplieger/web-terminal-engine) is the terminal emulator and browser renderer whose cells these glyphs are drawn for.
+- [web-terminal-ui](https://github.com/cplieger/web-terminal-ui) is the browser UI that declares the cell and ships the stylesheet this font pairs with.
+
+## Credits
+
+- The generated set follows the glyphs [kitty](https://github.com/kovidgoyal/kitty) draws itself, and the branch lines and commit markers follow kitty's designs.
+- [Monaspace](https://github.com/githubnext/monaspace) Neon NF is the companion text face the glyphs are measured against and paired with. It is used unmodified.
+
+## Documentation
+
+- [How it works](docs/how-it-works.md) lists the codepoint ranges, the measurements against Monaspace and the geometry rules, for anyone changing the glyphs.
 
 ## Contributing
 
-See [CONTRIBUTING](https://github.com/cplieger/.github/blob/main/CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING](https://github.com/cplieger/.github/blob/main/CONTRIBUTING.md).
 
 ## Disclaimer
 
@@ -170,7 +125,4 @@ This project was built with AI-assisted tooling using [Claude](https://claude.co
 
 ## License
 
-[Apache-2.0](LICENSE), the font file included. The glyph outlines are
-generated from this repository's own geometry tables; nothing of the companion
-face is copied into the font. Monaspace is consumed unmodified under its own
-[SIL Open Font License 1.1](https://github.com/githubnext/monaspace/blob/main/LICENSE).
+Apache-2.0, the font file included. See [LICENSE](LICENSE). The glyph outlines are generated from this repository's own geometry tables; nothing of the companion face is copied into the font. Monaspace is consumed unmodified under its own [SIL Open Font License 1.1](https://github.com/githubnext/monaspace/blob/main/LICENSE).
