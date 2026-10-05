@@ -115,7 +115,7 @@ The cell and the companion's measurements are constants in `glyphs/cell.py` and 
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING](https://github.com/cplieger/.github/blob/main/CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
 
