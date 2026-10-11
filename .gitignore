@@ -8,7 +8,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Kiro skill artifacts (app-review, judgement, steering-maintenance)
+# Local agent state
 **/.app-review/
 **/.judgement/
 **/.steering-maintenance/
