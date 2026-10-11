@@ -1,31 +1,52 @@
 #!/usr/bin/env bash
-# Cut a semver release from conventional-commit subjects since the last tag and
-# attach dist/* at creation. Runs after build and both test tiers in
+# Cut a semver release when the built assets differ from the latest release's,
+# attaching dist/* at creation. Runs after build and both test tiers in
 # publish.yaml; DRY_RUN=1 prints the decision and creates nothing.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-cplieger/web-terminal-glyphs}"
 DIST="${DIST:-dist}"
+ASSETS=(WebTerminalGlyphs.woff2 cell.json LICENSE NOTICE)
+
+for f in "${ASSETS[@]}"; do
+  [ -s "$DIST/$f" ] || {
+    echo "release: $DIST/$f missing or empty" >&2
+    exit 1
+  }
+done
 
 last="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+changed=""
+
+# The release is the four assets, so identical bytes publish nothing whatever
+# the commits say: a dev-only lock bump or a CI pin would otherwise cut a
+# version consumers gain nothing from. The build is deterministic, which is
+# what makes a byte compare meaningful.
+if [ -n "$last" ]; then
+  prev="$(mktemp -d)"
+  trap 'rm -rf "$prev"' EXIT
+  gh release download "$last" --repo "$REPO" --dir "$prev" "${ASSETS[@]/#/--pattern=}"
+  for f in "${ASSETS[@]}"; do
+    cmp -s "$DIST/$f" "$prev/$f" || changed+=" $f"
+  done
+  if [ -z "$changed" ]; then
+    echo "release: assets match ${last}; nothing to cut"
+    exit 0
+  fi
+  echo "release: changed since ${last}:${changed}"
+fi
+
 range="${last:+${last}..HEAD}"
 range="${range:-HEAD}"
-
 subjects="$(git log --format='%s' "$range" -- . ':!*.md' ':!.editorconfig' ':!.gitattributes' ':!.gitignore' ':!renovate.json')"
 bodies="$(git log --format='%b' "$range")"
 
-bump=""
+# Changed bytes always ship, so patch is the floor and commits only raise it.
+bump="patch"
 if grep -qE '^[a-z]+(\([^)]*\))?!:' <<<"$subjects" || grep -q '^BREAKING CHANGE:' <<<"$bodies"; then
   bump="major"
 elif grep -qE '^feat(\([^)]*\))?:' <<<"$subjects"; then
   bump="minor"
-elif grep -qE '^(fix|perf|sec|refactor|chore\(deps\))(\([^)]*\))?:' <<<"$subjects"; then
-  bump="patch"
-fi
-
-if [ -z "$bump" ]; then
-  echo "release: no releasing commit since ${last:-the beginning}; nothing to cut"
-  exit 0
 fi
 
 if [ -z "$last" ]; then
@@ -39,14 +60,7 @@ else
   esac
 fi
 
-for f in WebTerminalGlyphs.woff2 cell.json LICENSE NOTICE; do
-  [ -s "$DIST/$f" ] || {
-    echo "release: $DIST/$f missing or empty" >&2
-    exit 1
-  }
-done
-
-notes="$(printf '## %s\n\n%s\n' "$next" "$(sed 's/^/- /' <<<"$subjects")")"
+notes="$(printf '## %s\n\n%s\n' "$next" "$(sed 's/^/- /' <<<"${subjects:-rebuilt assets:${changed}}")")"
 echo "release: ${last:-<none>} -> $next ($bump)"
 
 if [ "${DRY_RUN:-0}" = "1" ]; then
@@ -73,6 +87,6 @@ if [ "$sha" != "$head" ]; then
 fi
 
 gh api --method POST "repos/${REPO}/git/refs" --raw-field ref="refs/tags/${next}" --raw-field sha="$sha" >/dev/null
-gh release create "$next" "$DIST"/WebTerminalGlyphs.woff2 "$DIST"/cell.json "$DIST"/LICENSE "$DIST"/NOTICE \
+gh release create "$next" "${ASSETS[@]/#/$DIST/}" \
   --repo "$REPO" --title "$next" --notes "$notes" --latest
-echo "release: created $next with 4 assets"
+echo "release: created $next with ${#ASSETS[@]} assets"
