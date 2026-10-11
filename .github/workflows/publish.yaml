@@ -3,11 +3,11 @@
 # has no go.mod, jsr.json or Dockerfile, so the central release pipeline never
 # runs for it; the release is owned here, the way tool-catalog's is.
 #
-# Version comes from conventional-commit subjects since the last tag: any `!`
-# or BREAKING CHANGE footer is a major, `feat` a minor, `fix`/`perf` a patch,
-# anything else no release. Immutable releases are on for the repo, so a
-# published asset can never be replaced; a broken release is followed by a
-# fixed one, never rewritten.
+# A release is cut only when the built assets differ from the latest release's
+# (scripts/release.sh). Its version comes from conventional-commit subjects
+# since the last tag: any `!` or BREAKING CHANGE footer is a major, `feat` a
+# minor, anything else a patch. Consumers pin a tag and fetch its assets, so a
+# broken release is followed by a fixed one, never rewritten or deleted.
 name: Publish
 
 on:

@@ -16,8 +16,8 @@ Rebuild with `uv run scripts/build.py` after each change to `glyphs/` or `script
 
 ## Releases
 
-A releasing commit that touches only `tests/`, `LICENSE` or `.github/` still publishes a new font release here.
+A push publishes a new font release only when the built `WebTerminalGlyphs.woff2`, `cell.json`, `LICENSE` or `NOTICE` differ from the latest release's files. A change to `tests/`, `.github/` or a lock file publishes nothing unless it changes one of those four files, whatever its type.
 
-A type the shared table does not name, such as `build:`, does not release. A `!` after any type, or a `BREAKING CHANGE:` footer on any commit, is a major release.
+When the files differ, the commit types since the last release set the version. A `!` after any type, or a `BREAKING CHANGE:` footer on any commit, is a major release. A `feat` is a minor release. Anything else is a patch.
 
 The release notes here list commit subjects as written, whatever their type, and never print a `BREAKING CHANGE:` footer. A breaking change states what a consumer must change in its subject.
