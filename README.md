@@ -91,7 +91,7 @@ uv run pytest tests/geometry     # invariants on the built font
 uv run pytest tests/render       # Chromium, Firefox and WebKit through Playwright
 ```
 
-The build needs Python 3.14 or newer. The glyph table derives the Legacy Computing Supplement entries from `unicodedata` names, and those exist from Unicode 16.0, the database Python 3.14 ships. Python 3.13 carries Unicode 15.1.
+The build needs Python 3.15 or newer. The glyph table derives the Legacy Computing Supplement entries from `unicodedata` names, and those exist from Unicode 16.0. Python 3.15 ships Unicode 17.0.
 
 The render tests need `uv run playwright install chromium firefox webkit` once. On a fresh Ubuntu machine, Firefox and WebKit also need `--with-deps`. The tests run each engine at device pixel ratio 1 and 2 and page zoom 1.0 and 1.1.
 
